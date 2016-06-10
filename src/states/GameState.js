@@ -2,9 +2,8 @@ export default class GameState extends Phaser.State {
   create () {
     var graphics = this.game.add.graphics(20, 20);
     var renderer = new MazeRenderer(graphics);
-    var grid = new Grid(10, 10);
+    var grid = new Grid(51, 37);
 
-    graphics.lineStyle(3, 0xFFFFFF, 1);
     renderer.draw(grid);
   }
 }
@@ -25,7 +24,7 @@ function Grid(w, h) {
   this.boxes = [];
 
   for (var i = 0; i < w * h; i++) {
-    this.boxes.push(new Box(10, 10));
+    this.boxes.push(new Box(15, 15));
   }
 }
 
@@ -77,11 +76,16 @@ MazeRenderer.prototype.draw = function(grid) {
 
       if (previous[col] && previous[col].walls.bottom === false) {
         box.set = previous[col].set;
-        previous[col].set.add(box);
+        box.set.add(box);
       }
       else {
         box.set = new Set();
         box.set.add(box);
+        box.set.color = Phaser.Color.getRandomColor();
+      }
+
+      if (previous[col]) {
+        previous[col].set.delete(previous[col]);
       }
     });
 
@@ -89,29 +93,45 @@ MazeRenderer.prototype.draw = function(grid) {
       let neighbor = current[col + 1];
 
       if (!neighbor) {
+        // This must be the rightmost box in this row
         box.walls.right = true;
       }
       else if (neighbor.set === box.set) {
+        // Divide neighbors from the same set to prevent loops
         box.walls.right = true;
       }
       else if (Math.random() >= .5) {
+        // If we add a wall, then keep them in separate sets
         box.walls.right = true;
       }
       else {
+        // Otherwise merge the sets
         box.walls.right = false;
-        neighbor.set = box.set;
-        box.set.add(neighbor);
+        neighbor.set.forEach((otherBox) => {
+          otherBox.set.delete(otherBox);
+          box.set.add(otherBox);
+          otherBox.set = box.set;
+        });
       }
+    });
 
-      let numOpenWalls = 0;
-
-      current.forEach((otherBox) => {
-        if (otherBox !== box && otherBox.set === box.set && otherBox.walls.bottom === false) {
-          numOpenWalls++;
-        }
-      });
-
-      box.walls.bottom = (numOpenWalls > 1) ? Math.random() > .5 : false;
+    current.forEach((box, col) => {
+      if (box.set.size === 1) {
+        box.walls.bottom = false;
+      }
+      else {
+        let count = 0;
+        let theOne = Math.random() * box.set.size >> 0;
+        box.set.forEach((otherBox) => {
+          if (count === theOne) {
+            otherBox.walls.bottom = false;
+          }
+          else {
+            otherBox.walls.bottom = (Math.random() >= .5);
+          }
+          count++;
+        });
+      }
     });
 
     if (row === rows - 1) {
@@ -120,10 +140,13 @@ MazeRenderer.prototype.draw = function(grid) {
 
         box.walls.bottom = true;
 
-        if (!!neighbor && box.set === neighbor.set) {
+        if (neighbor && box.set !== neighbor.set) {
           box.walls.right = false;
-          neighbor.set = box.set;
-          box.set.add(neighbor);
+          neighbor.set.forEach((otherBox) => {
+            otherBox.set.delete(otherBox);
+            box.set.add(otherBox);
+            otherBox.set = box.set;
+          });
         }
       });
     }
@@ -144,6 +167,12 @@ MazeRenderer.prototype.draw = function(grid) {
     let w = box.geometry.width;
     let h = box.geometry.height;
 
+    this.graphics.lineStyle(0, 0x000000, 0);
+    this.graphics.beginFill(box.set.color, .7);
+    this.graphics.drawRect(x, y, w, h);
+    this.graphics.endFill();
+
+    this.graphics.lineStyle(2, 0xFFFFFF, 1);
     this.graphics.moveTo(x, y);
 
     if (box.walls.top === true) {
