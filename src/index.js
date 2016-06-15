@@ -1,6 +1,5 @@
 import GameState from './states/GameState';
 import Menu from './states/Menu';
-// import TextTools from '../../phaser-plugin-text-tools';
 
 class Game extends Phaser.Game {
   constructor () {
@@ -11,4 +10,4 @@ class Game extends Phaser.Game {
   }
 }
 
-new Game();
+global.game = new Game();
